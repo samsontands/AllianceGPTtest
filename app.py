@@ -69,6 +69,15 @@ def get_all_chats():
     conn.close()
     return chats
 
+# Check if admin exists
+def admin_exists():
+    conn = sqlite3.connect('chat_app.db')
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1")
+    count = c.fetchone()[0]
+    conn.close()
+    return count > 0
+
 # Initialize Groq client
 def init_groq_client():
     try:
@@ -105,11 +114,16 @@ def main():
         elif choice == "Sign Up":
             new_username = st.text_input("New Username")
             new_password = st.text_input("New Password", type="password")
+            is_admin = st.checkbox("Register as Admin")
+            
             if st.button("Sign Up"):
-                if register_user(new_username, new_password):
-                    st.success("Account created successfully. Please log in.")
+                if is_admin and admin_exists():
+                    st.error("An admin already exists. Please register as a regular user.")
                 else:
-                    st.error("Username already exists")
+                    if register_user(new_username, new_password, is_admin):
+                        st.success("Account created successfully. Please log in.")
+                    else:
+                        st.error("Username already exists")
     
     else:
         st.write(f"Welcome, {st.session_state.user[1]}!")
