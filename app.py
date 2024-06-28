@@ -12,6 +12,14 @@ def init_db():
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, is_admin INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS chats
                  (id INTEGER PRIMARY KEY, user_id INTEGER, message TEXT, role TEXT, timestamp TEXT)''')
+    
+    # Check if admin exists, if not, create the fixed admin account
+    c.execute("SELECT * FROM users WHERE username=?", ('samson tan',))
+    if not c.fetchone():
+        hashed_password = bcrypt.hashpw('117853'.encode('utf-8'), bcrypt.gensalt())
+        c.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+                  ('samson tan', hashed_password, 1))
+    
     conn.commit()
     conn.close()
 
@@ -26,14 +34,14 @@ def authenticate(username, password):
         return user
     return None
 
-# User registration
-def register_user(username, password, is_admin=0):
+# User registration (for regular users only)
+def register_user(username, password):
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     conn = sqlite3.connect('chat_app.db')
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
-                  (username, hashed_password, is_admin))
+        c.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, 0)",
+                  (username, hashed_password))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -68,15 +76,6 @@ def get_all_chats():
     chats = c.fetchall()
     conn.close()
     return chats
-
-# Check if admin exists
-def admin_exists():
-    conn = sqlite3.connect('chat_app.db')
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1")
-    count = c.fetchone()[0]
-    conn.close()
-    return count > 0
 
 # Initialize Groq client
 def init_groq_client():
@@ -114,16 +113,14 @@ def main():
         elif choice == "Sign Up":
             new_username = st.text_input("New Username")
             new_password = st.text_input("New Password", type="password")
-            is_admin = st.checkbox("Register as Admin")
             
             if st.button("Sign Up"):
-                if is_admin and admin_exists():
-                    st.error("An admin already exists. Please register as a regular user.")
+                if new_username == 'samson tan':
+                    st.error("This username is reserved. Please choose a different username.")
+                elif register_user(new_username, new_password):
+                    st.success("Account created successfully. Please log in.")
                 else:
-                    if register_user(new_username, new_password, is_admin):
-                        st.success("Account created successfully. Please log in.")
-                    else:
-                        st.error("Username already exists")
+                    st.error("Username already exists")
     
     else:
         st.write(f"Welcome, {st.session_state.user[1]}!")
